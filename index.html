@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1420">
+  <title>Giải Sudoku từng bước</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css?v=20261106">
+</head>
+<body>
+  <header class="app-header">
+    <h1>🔢 Giải Sudoku từng bước</h1>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="scan" role="tab">1. Chụp đề</button>
+      <button class="tab" data-tab="edit" role="tab">2. Kiểm tra số</button>
+      <button class="tab" data-tab="solve" role="tab">3. Hướng dẫn giải</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ========== 1. CHỤP ========== -->
+    <section id="tab-scan" class="panel active">
+      <div class="scan-layout">
+        <div class="card camera-card">
+          <div class="camera-wrap" id="camera-wrap">
+            <canvas id="camera-canvas" width="1280" height="960"></canvas>
+            <div id="flash" class="flash"></div>
+            <div id="camera-placeholder" class="camera-placeholder">
+              <p>Bật camera để quay đề sudoku (báo, sách, màn hình…), hoặc chụp/tải ảnh có sẵn.</p>
+              <button id="btn-camera-big" class="btn primary">📷 Cho phép dùng camera</button>
+              <p id="camera-note" class="muted small"></p>
+            </div>
+          </div>
+          <div class="row wrap">
+            <button id="btn-capture" class="btn primary" disabled>✅ Đọc đề trong khung</button>
+            <button id="btn-camera" class="btn">📷 Bật camera</button>
+          </div>
+          <div class="row wrap">
+            <label class="btn">
+              📸 Chụp bằng app camera
+              <input id="file-camera" type="file" accept="image/*" capture="environment" hidden>
+            </label>
+            <label class="btn">
+              🖼️ Chọn ảnh có sẵn
+              <input id="file-input" type="file" accept="image/*" hidden>
+            </label>
+          </div>
+          <label class="row slider-row">
+            Cỡ khung lưới
+            <input id="grid-size" type="range" min="30" max="95" value="72">
+          </label>
+          <p class="muted small">Mẹo: kéo khung xanh trùm <b>khít mép ngoài</b> của đề, chụp thẳng (không nghiêng), nơi đủ sáng. Số đọc sai sửa được ở bước 2.</p>
+        </div>
+
+        <div class="card">
+          <h2>Cách dùng</h2>
+          <p class="instruction">
+            1. Căn đề sudoku vào <b>khung xanh 9×9</b> — kéo khung để di chuyển, thanh trượt để chỉnh cỡ.<br><br>
+            2. Bấm <b>✅ Đọc đề trong khung</b>: app tự nhận các chữ số in.<br><br>
+            3. Sang bước 2 kiểm tra: ô nghi đọc sai có dấu <span class="legend-suspect">?</span>, chạm vào ô để sửa.<br><br>
+            4. Bấm <b>🧠 Giải ngay</b> để xem lời giải từng bước, mỗi bước đều giải thích <i>vì sao</i> điền số đó.
+          </p>
+          <p class="muted small">Không có ảnh? Sang thẳng bước 2 để nhập tay hoặc lấy đề mẫu.</p>
+          <div class="row wrap">
+            <button class="btn" onclick="document.querySelector('[data-tab=edit]').click()">Nhập tay ở bước 2 →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 2. KIỂM TRA ========== -->
+    <section id="tab-edit" class="panel">
+      <div class="card">
+        <h2>Kiểm tra &amp; sửa số</h2>
+        <p class="muted"><b>Chạm vào ô để nhập/sửa số.</b> Ô có dấu <span class="legend-suspect">?</span> là ô app nghi đọc sai từ ảnh. Ô viền đỏ là ô trùng số với hàng/cột/khối của nó.</p>
+        <div class="board-wrap">
+          <div id="board" class="board"></div>
+          <div id="validation" class="validation"></div>
+        </div>
+        <div class="row wrap">
+          <button id="btn-solve" class="btn primary">🧠 Giải ngay</button>
+          <button id="btn-example" class="btn">🎲 Đề mẫu ngẫu nhiên</button>
+          <button id="btn-clear" class="btn">Xoá hết</button>
+        </div>
+        <details class="help">
+          <summary>Dán đề dạng chữ (81 ký tự)</summary>
+          <p class="muted small">Dùng chữ số 1–9, ô trống là <code>0</code> hoặc <code>.</code>; xuống dòng/dấu cách tuỳ ý. Ví dụ: <code>53..7....6..195...</code></p>
+          <textarea id="paste-box" class="paste-box" placeholder="53..7....&#10;6..195...&#10;.98....6.&#10;..."></textarea>
+          <div class="row">
+            <button id="btn-paste" class="btn">↧ Nạp đề từ ô trên</button>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ========== 3. GIẢI ========== -->
+    <section id="tab-solve" class="panel">
+      <div class="solve-layout">
+        <div class="card">
+          <div class="board-wrap">
+            <div id="solve-board" class="board small"></div>
+            <div class="progress"><div id="progress-bar"></div></div>
+            <div id="step-counter" class="step-counter"></div>
+            <span id="step-badge" class="step-badge" hidden></span>
+            <div id="step-title" class="step-title"></div>
+            <div id="step-desc" class="step-desc"></div>
+            <div class="controls">
+              <button id="btn-first" class="btn" title="Về đầu">⏮</button>
+              <button id="btn-prev" class="btn" title="Bước trước (←)">◀ Trước</button>
+              <button id="btn-next" class="btn primary big" title="Bước tiếp (→)">Tiếp ▶</button>
+              <button id="btn-play" class="btn" title="Tự chạy hết các bước (Space)">⏩ Tự chạy</button>
+            </div>
+            <label class="slider-row" style="width:100%">
+              Tốc độ
+              <input id="speed" type="range" min="300" max="3000" value="1400" step="100" dir="rtl">
+            </label>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Toàn bộ lời giải <span id="solution-length" class="muted"></span></h3>
+          <p class="muted small">Bấm vào một bước để nhảy tới đó. H3C5 = hàng 3, cột 5.</p>
+          <div id="step-list" class="step-list"></div>
+          <details class="help">
+            <summary>Các kỹ thuật được dùng</summary>
+            <ul>
+              <li><b>Ô đơn</b>: ô chỉ còn đúng một số có thể điền.</li>
+              <li><b>Vị trí duy nhất</b>: trong một hàng/cột/khối, chỉ một ô đặt được số đó.</li>
+              <li><b>Khoanh vùng</b>: số bị "nhốt" trên một hàng/cột của khối, loại trừ được chỗ khác.</li>
+              <li><b>Cặp số</b>: hai ô cùng cặp ứng viên chiếm chỗ, loại số ở các ô còn lại.</li>
+              <li><b>Suy luận sâu</b>: thử từng khả năng và loại dần (dành cho đề rất khó).</li>
+            </ul>
+          </details>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="num-picker" class="num-picker" hidden role="dialog" aria-label="Chọn số cho ô">
+    <div class="picker-title"></div>
+    <div class="picker-grid">
+      <button type="button" data-num="1">1</button>
+      <button type="button" data-num="2">2</button>
+      <button type="button" data-num="3">3</button>
+      <button type="button" data-num="4">4</button>
+      <button type="button" data-num="5">5</button>
+      <button type="button" data-num="6">6</button>
+      <button type="button" data-num="7">7</button>
+      <button type="button" data-num="8">8</button>
+      <button type="button" data-num="9">9</button>
+      <button type="button" data-num="0" class="erase">⌫ Xoá ô (để trống)</button>
+    </div>
+    <button type="button" class="btn picker-cancel">Đóng</button>
+  </div>
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="js/sudoku.js?v=20261106"></script>
+  <script src="js/vision.js?v=20261106"></script>
+  <script src="js/app.js?v=20261106"></script>
+</body>
+</html>

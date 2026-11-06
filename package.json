@@ -1,0 +1,29 @@
+{
+  "name": "sudoku-step-solver",
+  "version": "1.0.0",
+  "description": "Giải Sudoku từng bước từ ảnh chụp — static web app, no build, no dependencies (Vietnamese step-by-step Sudoku solver with OCR from photos)",
+  "license": "MIT",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node tests/solver.test.js && node tests/vision.test.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://example.com/your-user/sudoku-step-solver.git"
+  },
+  "keywords": [
+    "sudoku",
+    "solver",
+    "step-by-step",
+    "ocr",
+    "template-matching",
+    "vanilla-js",
+    "no-dependencies",
+    "vietnamese"
+  ]
+}
