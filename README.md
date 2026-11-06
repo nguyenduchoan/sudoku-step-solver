@@ -1,6 +1,6 @@
 # 🔢 Giải Sudoku từng bước
 
-[![CI](https://github.com/your-user/sudoku-step-solver/actions/workflows/ci.yml/badge.svg)](https://github.com/your-user/sudoku-step-solver/actions/workflows/ci.yml)
+[![CI](https://github.com/nguyenduchoan/sudoku-step-solver/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenduchoan/sudoku-step-solver/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![No dependencies](https://img.shields.io/badge/dependencies-0-success)
 

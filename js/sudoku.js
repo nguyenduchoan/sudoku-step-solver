@@ -128,22 +128,39 @@
   // Mỗi bước: { cell, value, technique, title, detail, highlights }
   //   highlights: { cells: [chỉ số làm nổi bật], unit: [chỉ số đơn vị] }
 
-  function findNakedSingle(grid, cands) {
+  // notes (tuỳ chọn): mảng 81 Map(giá trị -> lý do) ghi lại các ứng viên đã bị
+  // loại bởi phép loại trừ ở bước trước, để lời giải thích nêu đúng căn cứ
+  // thay vì nói mọi số đều "đã xuất hiện trong hàng/cột/khối".
+  function elimReason(notes, cell, value) {
+    return (notes && notes[cell].get(value)) || 'phép loại trừ trước đó';
+  }
+
+  function findNakedSingle(grid, cands, notes) {
     for (let i = 0; i < 81; i++) {
       if (grid[i] || cands[i].size !== 1) continue;
       const v = [...cands[i]][0];
       const [r, c] = rc(i);
+      // Những số không nhìn thấy trong hàng/cột/khối nhưng đã bị loại
+      // bởi phép loại trừ ở bước trước
+      const byTech = candidatesAt(grid, i).filter(x => x !== v);
+      let detail;
+      if (byTech.length) {
+        const reasons = [...new Set(byTech.map(x => elimReason(notes, i, x)))];
+        detail = `Xét ${cellName(i)}: ${byTech.join(' và ')} đã bị loại ở bước trước (${reasons.join('; ')}), các số còn lại đều đã xuất hiện trong hàng ${r + 1}, cột ${c + 1} hoặc khối ${boxOf(r, c) + 1}, nên ô này chỉ có thể là ${v}.`;
+      } else {
+        detail = `Xét ${cellName(i)}: các số khác đều đã xuất hiện trong hàng ${r + 1}, cột ${c + 1} hoặc khối ${boxOf(r, c) + 1}, nên ô này chỉ có thể là ${v}.`;
+      }
       return {
         cell: i, value: v, technique: 'naked-single',
         title: `Ô chỉ còn một khả năng: điền ${v}`,
-        detail: `Xét ${cellName(i)}: các số khác đều đã xuất hiện trong hàng ${r + 1}, cột ${c + 1} hoặc khối ${boxOf(r, c) + 1}, nên ô này chỉ có thể là ${v}.`,
+        detail,
         highlights: { cells: PEERS[i].filter(j => grid[j]), unit: [] },
       };
     }
     return null;
   }
 
-  function findHiddenSingle(grid, cands) {
+  function findHiddenSingle(grid, cands, notes) {
     for (let u = 0; u < UNITS.length; u++) {
       const unit = UNITS[u];
       for (let v = 1; v <= 9; v++) {
@@ -153,10 +170,17 @@
           if (!grid[i] && cands[i].has(v)) { spot = i; count++; if (count > 1) break; }
         }
         if (count === 1) {
+          // Ô trống không "nhìn thấy" v qua hàng/cột/khối — chỉ bị chặn
+          // nhờ phép loại trừ ở bước trước
+          const blocked = unit.filter(j =>
+            j !== spot && !grid[j] && !PEERS[j].some(k => grid[k] === v));
+          const techPart = blocked.length
+            ? `; riêng ${blocked.map(cellName).join(' và ')} thì ${v} đã bị loại ở bước trước (${[...new Set(blocked.map(j => elimReason(notes, j, v)))].join('; ')})`
+            : '';
           return {
             cell: spot, value: v, technique: 'hidden-single',
             title: `Chỉ một chỗ đặt được số ${v} trong ${unitName(u)}`,
-            detail: `Trong ${unitName(u)}, mọi ô trống khác đều không thể chứa ${v} (vì ${v} đã có ở hàng/cột/khối giao với chúng). Vậy ${cellName(spot)} phải là ${v}.`,
+            detail: `Trong ${unitName(u)}, mọi ô trống khác đều không thể chứa ${v} (vì ${v} đã có ở hàng/cột/khối giao với chúng${techPart}). Vậy ${cellName(spot)} phải là ${v}.`,
             highlights: { cells: unit.filter(i => i !== spot), unit: [u] },
           };
         }
@@ -228,38 +252,63 @@
     return null;
   }
 
-  // Sinh toàn bộ các bước giải. Nếu bí (cần đoán), dùng nghiệm từ backtracking
-  // và ghi chú bước "thử & suy luận sâu".
+  // Sinh toàn bộ các bước giải. Bảng ứng viên được duy trì xuyên suốt:
+  // điền số thì loại ứng viên ở các ô cùng hàng/cột/khối, các phép loại trừ
+  // (khoanh vùng, cặp số) được giữ lại và xâu chuỗi đến khi hết tiến triển.
+  // Nếu vẫn bí, lấy số từ nghiệm backtracking và nói rõ đó là suy luận
+  // bắt buộc hay chỉ là lựa chọn (khi đề có nhiều nghiệm).
   function solveSteps(grid) {
-    const g = grid.slice();
     const solution = solve(grid);
     if (!solution) return { solvable: false, steps: [] };
+    const g = grid.slice();
+    const cands = allCandidates(g);
     const steps = [];
+    // Ghi lại lý do mỗi ứng viên bị loại để các bước sau dẫn lại đúng căn cứ
+    const elimNotes = Array.from({ length: 81 }, () => new Map());
+    function place(i, v) {
+      g[i] = v;
+      cands[i] = null;
+      for (const j of PEERS[i]) if (cands[j]) cands[j].delete(v);
+    }
     let guard = 0;
-    while (guard++ < 2000) {
-      if (!g.includes(0)) break;
-      const cands = allCandidates(g);
-      let step = findNakedSingle(g, cands) || findHiddenSingle(g, cands);
+    while (guard++ < 3000 && g.includes(0)) {
+      const step = findNakedSingle(g, cands, elimNotes) || findHiddenSingle(g, cands, elimNotes);
       if (step) {
-        g[step.cell] = step.value;
+        place(step.cell, step.value);
         steps.push(step);
         continue;
       }
-      // Thử các kỹ thuật loại trừ rồi quay lại tìm single
-      const elimStep = findLockedCandidates(g, cands) || findNakedPair(g, cands);
-      if (elimStep) {
-        for (const e of elimStep.eliminations) cands[e.cell].delete(e.value);
-        let follow = findNakedSingle(g, cands) || findHiddenSingle(g, cands);
-        if (follow) {
-          follow.detail = `${elimStep.detail} Nhờ đó: ${follow.detail}`;
-          follow.title = `${elimStep.title} → điền ${follow.value}`;
-          follow.technique = elimStep.technique;
-          g[follow.cell] = follow.value;
-          steps.push(follow);
-          continue;
+      // Xâu chuỗi các phép loại trừ đến khi điền được ô hoặc hết tiến triển;
+      // ứng viên đã loại được giữ nguyên cho các vòng sau.
+      const chain = [];
+      let follow = null;
+      for (;;) {
+        const elim = findLockedCandidates(g, cands) || findNakedPair(g, cands);
+        if (!elim) break;
+        let removed = false;
+        for (const e of elim.eliminations) {
+          if (cands[e.cell] && cands[e.cell].delete(e.value)) {
+            removed = true;
+            elimNotes[e.cell].set(e.value, elim.title);
+          }
         }
+        if (!removed) break;
+        chain.push(elim);
+        follow = findNakedSingle(g, cands, elimNotes) || findHiddenSingle(g, cands, elimNotes);
+        if (follow) break;
       }
-      // Bí: lấy từ nghiệm, chọn ô ít ứng viên nhất cho tự nhiên
+      if (follow) {
+        const last = chain[chain.length - 1];
+        follow.title = `${last.title} → điền ${follow.value}`;
+        follow.detail = `${chain.map(c => c.detail).join(' ')} Nhờ đó: ${follow.detail}`;
+        follow.technique = last.technique;
+        follow.highlights = last.highlights;
+        place(follow.cell, follow.value);
+        steps.push(follow);
+        continue;
+      }
+      if (chain.length) continue; // có loại trừ nhưng chưa điền được: thử lại từ đầu với ứng viên đã thu hẹp
+      // Bí thật sự: chọn ô ít ứng viên nhất, kiểm chứng từng ứng viên bằng backtracking
       let best = -1, bestLen = 10;
       for (let i = 0; i < 81; i++) {
         if (g[i]) continue;
@@ -267,14 +316,28 @@
         if (n && n < bestLen) { best = i; bestLen = n; }
       }
       if (best === -1) break;
+      const options = [...cands[best]];
+      const viable = options.filter(v => {
+        if (v === solution[best]) return true;
+        const t = g.slice();
+        t[best] = v;
+        return countSolutions(t, 1) > 0;
+      });
       const v = solution[best];
+      let title, detail;
+      if (viable.length === 1) {
+        title = `Suy luận sâu: điền ${v}`;
+        detail = `${cellName(best)} còn ${options.length} khả năng (${options.join(', ')}). Thử lần lượt: mọi khả năng khác đều dẫn tới mâu thuẫn ở các bước sau, chỉ ${v} đi được tới cùng, nên ô này buộc phải là ${v}.`;
+      } else {
+        title = `Đề nhiều nghiệm: chọn ${v}`;
+        detail = `${cellName(best)} còn ${options.length} khả năng (${options.join(', ')}). Đề này có nhiều hơn một nghiệm nên ô này không bị ép buộc (${viable.join(', ')} đều dẫn tới nghiệm hợp lệ). Chọn ${v} theo một nghiệm để đi tiếp.`;
+      }
       steps.push({
         cell: best, value: v, technique: 'advanced',
-        title: `Suy luận sâu: điền ${v}`,
-        detail: `${cellName(best)} còn ${bestLen} khả năng (${[...cands[best]].join(', ')}). Thử lần lượt từng khả năng: chỉ ${v} không dẫn tới mâu thuẫn ở các bước sau, nên ô này là ${v}.`,
+        title, detail,
         highlights: { cells: [], unit: [] },
       });
-      g[best] = v;
+      place(best, v);
     }
     return { solvable: true, steps, solution };
   }

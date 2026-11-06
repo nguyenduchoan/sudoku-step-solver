@@ -83,26 +83,31 @@
     rafId = requestAnimationFrame(loopCamera);
   }
 
+  let camStarting = false;
   async function startCamera() {
+    if (camStarting) return; // tránh hai lần khởi động chồng nhau
+    camStarting = true;
     try {
+      stopCamera(); // giải phóng phiên cũ trước khi mở phiên mới
       camStream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
       });
+      stillImage = null;
+      video = document.createElement('video');
+      video.srcObject = camStream;
+      video.setAttribute('playsinline', '');
+      await video.play();
+      camCanvas.width = video.videoWidth || 1280;
+      camCanvas.height = video.videoHeight || 960;
+      $('camera-placeholder').hidden = true;
+      $('btn-capture').disabled = false;
+      loopCamera();
     } catch (e) {
+      stopCamera();
       toast('Không mở được camera: ' + e.message + '. Hãy dùng nút tải/chụp ảnh bên dưới.');
-      return;
+    } finally {
+      camStarting = false;
     }
-    stillImage = null;
-    video = document.createElement('video');
-    video.srcObject = camStream;
-    video.setAttribute('playsinline', '');
-    await video.play();
-    camCanvas.width = video.videoWidth || 1280;
-    camCanvas.height = video.videoHeight || 960;
-    $('camera-placeholder').hidden = true;
-    $('btn-capture').disabled = false;
-    cancelAnimationFrame(rafId);
-    loopCamera();
   }
 
   function stopCamera() {
@@ -178,6 +183,7 @@
     }
     grid = res.grid.slice();
     suspects = res.confidence.map((c, i) => grid[i] > 0 && c < 0.25);
+    invalidateSolution();
     if (video) { drawOverlay(); } else { drawStill(); }
     showTab('edit');
     const nSus = suspects.filter(Boolean).length;
@@ -272,7 +278,11 @@
   picker.querySelectorAll('[data-num]').forEach(btn => {
     btn.addEventListener('click', () => {
       if (pickingCell < 0) return;
-      grid[pickingCell] = +btn.dataset.num;
+      const v = +btn.dataset.num;
+      if (grid[pickingCell] !== v) {
+        grid[pickingCell] = v;
+        invalidateSolution();
+      }
       suspects[pickingCell] = false;
       closePicker();
       renderEditBoard();
@@ -286,6 +296,7 @@
   $('btn-clear').addEventListener('click', () => {
     grid = new Array(81).fill(0);
     suspects = new Array(81).fill(false);
+    invalidateSolution();
     renderEditBoard();
   });
 
@@ -293,6 +304,7 @@
     const { puzzle } = S.generate(30 + Math.floor(Math.random() * 8));
     grid = puzzle;
     suspects = new Array(81).fill(false);
+    invalidateSolution();
     renderEditBoard();
     toast('Đã sinh một đề ngẫu nhiên có nghiệm duy nhất.');
   });
@@ -302,6 +314,7 @@
     if (!g) { toast('Chuỗi chưa đủ 81 ký tự (dùng 1–9, ô trống là 0 hoặc dấu chấm).'); return; }
     grid = g;
     suspects = new Array(81).fill(false);
+    invalidateSolution();
     renderEditBoard();
   });
 
@@ -334,6 +347,17 @@
     const g = grid.slice();
     for (let k = 0; k < stepIndex; k++) g[steps[k].cell] = steps[k].value;
     return g;
+  }
+
+  // Huỷ lời giải mỗi khi đề thay đổi: bước cũ không còn đúng với đề mới.
+  function invalidateSolution() {
+    if (!steps.length && !solution) return;
+    stopPlay();
+    steps = [];
+    solution = null;
+    stepIndex = 0;
+    buildStepList();
+    renderStep();
   }
 
   const TECH_LABEL = {
@@ -370,10 +394,14 @@
       badge.textContent = TECH_LABEL[justDone.technique] || justDone.technique;
       $('step-title').textContent = justDone.title;
       $('step-desc').textContent = justDone.detail;
-    } else {
+    } else if (steps.length) {
       badge.hidden = true;
       $('step-title').textContent = 'Sẵn sàng!';
       $('step-desc').textContent = 'Bấm "Tiếp ▶" để xem từng bước, hoặc "⏩ Tự chạy" để xem cả lời giải.';
+    } else {
+      badge.hidden = true;
+      $('step-title').textContent = 'Chưa có lời giải';
+      $('step-desc').textContent = 'Quay lại bước 2 và bấm "🧠 Giải ngay" để tạo lời giải cho đề hiện tại.';
     }
     if (stepIndex === steps.length && steps.length) {
       $('step-title').textContent = '🎉 Hoàn thành!';
@@ -391,6 +419,7 @@
     $('btn-prev').disabled = stepIndex === 0;
     $('btn-first').disabled = stepIndex === 0;
     $('btn-next').disabled = stepIndex >= steps.length;
+    $('btn-play').disabled = !steps.length;
   }
 
   function buildStepList() {
@@ -419,6 +448,7 @@
   }
   $('btn-play').addEventListener('click', () => {
     if (playTimer) { stopPlay(); return; }
+    if (!steps.length) return;
     if (stepIndex >= steps.length) stepIndex = 0;
     $('btn-play').textContent = '⏸ Dừng';
     const tick = () => { if (!next()) stopPlay(); };
@@ -438,6 +468,7 @@
 
   // Khởi tạo
   renderEditBoard();
+  renderStep();
   if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
     $('camera-note').textContent = 'Camera trực tiếp cần https hoặc localhost — vẫn dùng được nút chụp/tải ảnh.';
   }
