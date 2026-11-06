@@ -42,4 +42,4 @@
   điều khiển Tiếp/Trước/Tự chạy/nhảy bước, phím tắt ←/→/Space.
 - Test chạy bằng Node thuần: `tests/solver.test.js`, `tests/vision.test.js`.
 - `scripts/serve.js` (máy chủ tĩnh tối giản), `scripts/deploy-hub.sh`
-  (triển khai lên Server Hub), CI GitHub Actions (Node 18/20/22).
+  (triển khai lên Server Hub).

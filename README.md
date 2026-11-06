@@ -1,6 +1,5 @@
 # 🔢 Giải Sudoku từng bước
 
-[![CI](https://github.com/nguyenduchoan/sudoku-step-solver/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenduchoan/sudoku-step-solver/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![No dependencies](https://img.shields.io/badge/dependencies-0-success)
 
@@ -45,7 +44,7 @@ node tests/solver.test.js   # hợp lệ, đếm nghiệm, giải từng bước
 node tests/vision.test.js   # nhận chữ số trên ảnh mô phỏng sạch và có nhiễu
 ```
 
-Yêu cầu Node.js ≥ 16, không cần `npm install`. CI chạy cùng các lệnh này trên Node 18/20/22.
+Yêu cầu Node.js ≥ 16, không cần `npm install`.
 
 ## Trên Server Hub của máy này (tuỳ chọn)
 

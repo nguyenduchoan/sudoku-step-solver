@@ -33,7 +33,7 @@ Yêu cầu Node.js ≥ 16, không cần `npm install`.
 
 1. Fork và tạo nhánh từ `main`.
 2. Thêm/cập nhật test trong `tests/` cho hành vi mới (đặc biệt là kỹ thuật giải mới trong `solveSteps` hoặc thay đổi nhận dạng).
-3. Chạy `npm test` sạch lỗi; CI cũng chạy đúng các lệnh đó trên Node 18/20/22.
+3. Chạy `npm test` sạch lỗi (Node ≥ 16, không cần cài gì thêm).
 4. Mở Pull Request, mô tả **vì sao** thay đổi (kèm ảnh chụp màn hình nếu đổi giao diện).
 
 ## Báo lỗi
